@@ -49,9 +49,6 @@ class CheckVersion():
 
     def run(self):
         self.check_for_new_version()
-        
-        # refresh scene exceptions too
-        scene_exceptions.retrieve_exceptions()
 
     def find_install_type(self):
         """
@@ -81,6 +78,10 @@ class CheckVersion():
         
         force: if true the VERSION_NOTIFY setting will be ignored and a check will be forced
         """
+
+        # refresh scene exceptions too
+        scene_exceptions.retrieve_exceptions()
+        ui.notifications.message('Updateing scene exceptions')
 
         if not sickbeard.VERSION_NOTIFY and not force:
             logger.log(u"Version checking is disabled, not checking for the newest version")
@@ -244,7 +245,7 @@ class GitUpdateManager(UpdateManager):
                 p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, cwd=sickbeard.PROG_DIR)
                 output, err = p.communicate()
                 logger.log(u"git output: "+output, logger.DEBUG)
-            except:
+            except OSError:
                 logger.log(u"Command "+cmd+" didn't work, couldn't find git.")
                 continue
             
@@ -290,12 +291,12 @@ class GitUpdateManager(UpdateManager):
         branch_info = self._run_git('symbolic-ref -q HEAD')
 
         if not branch_info or not branch_info[0]:
-            return 'torrentProviders'
+            return 'master'
 
         branch = branch_info[0].strip().replace('refs/heads/', '', 1)
 
-        return branch or 'torrentProviders'
-
+        return branch or 'master'
+    
 
     def _check_github_for_update(self):
         """
@@ -311,8 +312,7 @@ class GitUpdateManager(UpdateManager):
         gh = github.GitHub()
 
         # find newest commit
-        logger.log(u"Checking updates on junalmeida/Sick-Beard/" + self.branch)
-        for curCommit in gh.commits('junalmeida', 'Sick-Beard', self.branch):
+        for curCommit in gh.commits('lad1337', 'Sick-Beard', self.branch):
             if not self._newest_commit_hash:
                 self._newest_commit_hash = curCommit['sha']
                 if not self._cur_commit_hash:
@@ -340,9 +340,9 @@ class GitUpdateManager(UpdateManager):
             return
 
         if self._newest_commit_hash:
-            url = 'http://github.com/junalmeida/Sick-Beard/compare/'+self._cur_commit_hash+'...'+self._newest_commit_hash
+            url = 'http://github.com/lad1337/Sick-Beard/compare/'+self._cur_commit_hash+'...'+self._newest_commit_hash
         else:
-            url = 'http://github.com/junalmeida/Sick-Beard/commits/'
+            url = 'http://github.com/lad1337/Sick-Beard/commits/'
 
         new_str = 'There is a <a href="'+url+'" onclick="window.open(this.href); return false;">newer version available</a> ('+message+')'
         new_str += "&mdash; <a href=\""+self.get_update_url()+"\">Update Now</a>"
@@ -448,7 +448,7 @@ class SourceUpdateManager(GitUpdateManager):
         Downloads the latest source tarball from github and installs it over the existing version.
         """
 
-        tar_download_url = 'https://github.com/junalmeida/Sick-Beard/tarball/'+version.SICKBEARD_VERSION
+        tar_download_url = 'https://github.com/lad1337/Sick-Beard/tarball/'+version.SICKBEARD_VERSION
         sb_update_dir = os.path.join(sickbeard.PROG_DIR, 'sb-update')
         version_path = os.path.join(sickbeard.PROG_DIR, 'version.txt')
 

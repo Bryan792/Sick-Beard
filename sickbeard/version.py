@@ -1,1 +1,1 @@
-SICKBEARD_VERSION = "torrentProviders"
+SICKBEARD_VERSION = "anime"

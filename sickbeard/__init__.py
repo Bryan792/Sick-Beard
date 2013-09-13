@@ -30,7 +30,7 @@ from threading import Lock
 
 # apparently py2exe won't build these unless they're imported somewhere
 from sickbeard import providers, metadata
-from providers import ezrss, tvtorrents, btn, nzbsrus, newznab, womble, nzbx, omgwtfnzbs
+from providers import ezrss, tvtorrents, btn, nzbsrus, newznab, womble, nzbx, omgwtfnzbs, fanzub
 from providers import kickass, torrentz, dtt, torrentleech, thepiratebay, publichd, torrentday
 from providers import sceneaccess, iptorrents, bithdtv, fucklimits
 from sickbeard.config import CheckSection, check_setting_int, check_setting_str, ConfigMigrator
@@ -63,6 +63,7 @@ MY_FULLNAME = None
 MY_NAME = None
 MY_ARGS = []
 SYS_ENCODING = ''
+_CONFIG_SYS_ENCODING = ''
 DATA_DIR = ''
 CREATEPID = False
 PIDFILE = ''
@@ -79,7 +80,7 @@ searchQueueScheduler = None
 properFinderScheduler = None
 autoPostProcesserScheduler = None
 
-showList = None
+showList = []
 loadingShowList = None
 
 providerList = []
@@ -128,6 +129,7 @@ METADATA_SYNOLOGY = None
 QUALITY_DEFAULT = None
 STATUS_DEFAULT = None
 FLATTEN_FOLDERS_DEFAULT = None
+ANIME_DEFAULT = None
 PROVIDER_ORDER = []
 
 NAMING_MULTI_EP = None
@@ -135,6 +137,9 @@ NAMING_PATTERN = None
 NAMING_ABD_PATTERN = None
 NAMING_CUSTOM_ABD = None
 NAMING_FORCE_FOLDERS = False
+NAMING_ANIME_PATTERN = None
+NAMING_ANIME_MULTI_EP = None
+NAMING_CUSTOM_ANIME = None
 
 TVDB_API_KEY = '9DAF49C96CBF8DAC'
 TVDB_BASE_URL = None
@@ -246,6 +251,8 @@ NEWZBIN = False
 NEWZBIN_USERNAME = None
 NEWZBIN_PASSWORD = None
 
+FANZUB = False
+
 SAB_USERNAME = None
 SAB_PASSWORD = None
 SAB_APIKEY = None
@@ -329,6 +336,14 @@ NMJ_HOST = None
 NMJ_DATABASE = None
 NMJ_MOUNT = None
 
+ANIMESUPPORT = False
+USE_ANIDB = False
+ANIDB_USERNAME = None
+ANIDB_PASSWORD = None
+ANIDB_USE_MYLIST = 0
+ADBA_CONNECTION = None
+ANIME_SPLIT_HOME = False
+
 USE_SYNOINDEX = False
 
 USE_NMJv2 = False
@@ -378,7 +393,7 @@ def initialize(consoleLogging=True):
     with INIT_LOCK:
 
         global LOG_DIR, WEB_PORT, WEB_LOG, WEB_ROOT, WEB_USERNAME, WEB_PASSWORD, WEB_HOST, WEB_IPV6, USE_API, API_KEY, ENABLE_HTTPS, HTTPS_CERT, HTTPS_KEY, \
-                USE_NZBS, USE_TORRENTS, NZB_METHOD, NZB_DIR,TORRENT_METHOD, DOWNLOAD_PROPERS, PREFER_EPISODE_RELEASES, \
+                  USE_NZBS, USE_TORRENTS, NZB_METHOD, NZB_DIR, TORRENT_METHOD, DOWNLOAD_PROPERS, PREFER_EPISODE_RELEASES, \
                 SAB_USERNAME, SAB_PASSWORD, SAB_APIKEY, SAB_CATEGORY, SAB_HOST, \
                 TORRENT_USERNAME, TORRENT_PASSWORD, TORRENT_HOST, TORRENT_PATH, TORRENT_RATIO, TORRENT_PAUSED, \
                 NZBGET_PASSWORD, NZBGET_CATEGORY, NZBGET_HOST, currentSearchScheduler, backlogSearchScheduler, \
@@ -400,7 +415,7 @@ def initialize(consoleLogging=True):
                 THEPIRATEBAY, THEPIRATEBAY_TRUSTED, THEPIRATEBAY_PROXY, THEPIRATEBAY_PROXY_URL, THEPIRATEBAY_URL_OVERRIDE, \
                 TVTORRENTS, TVTORRENTS_DIGEST, TVTORRENTS_HASH, BTN, BTN_API_KEY, TORRENT_DIR, USENET_RETENTION, SOCKET_TIMEOUT, \
                 SEARCH_FREQUENCY, DEFAULT_SEARCH_FREQUENCY, BACKLOG_SEARCH_FREQUENCY, \
-                QUALITY_DEFAULT, FLATTEN_FOLDERS_DEFAULT, STATUS_DEFAULT, \
+                QUALITY_DEFAULT, FLATTEN_FOLDERS_DEFAULT, ANIME_DEFAULT, STATUS_DEFAULT, \
                 GROWL_NOTIFY_ONSNATCH, GROWL_NOTIFY_ONDOWNLOAD, TWITTER_NOTIFY_ONSNATCH, TWITTER_NOTIFY_ONDOWNLOAD, \
                 USE_GROWL, GROWL_HOST, GROWL_PASSWORD, USE_PROWL, PROWL_NOTIFY_ONSNATCH, PROWL_NOTIFY_ONDOWNLOAD, PROWL_API, PROWL_PRIORITY, PROG_DIR, NZBMATRIX, NZBMATRIX_USERNAME, \
                 USE_PYTIVO, PYTIVO_NOTIFY_ONSNATCH, PYTIVO_NOTIFY_ONDOWNLOAD, PYTIVO_UPDATE_LIBRARY, PYTIVO_HOST, PYTIVO_SHARE_NAME, PYTIVO_TIVO_NAME, \
@@ -408,18 +423,19 @@ def initialize(consoleLogging=True):
                 NZBMATRIX_APIKEY, versionCheckScheduler, VERSION_NOTIFY, PROCESS_AUTOMATICALLY, \
                 KEEP_PROCESSED_DIR, TV_DOWNLOAD_DIR, TVDB_BASE_URL, MIN_SEARCH_FREQUENCY, \
                 showQueueScheduler, searchQueueScheduler, ROOT_DIRS, CACHE_DIR, ACTUAL_CACHE_DIR, TVDB_API_PARMS, \
-                NAMING_PATTERN, NAMING_MULTI_EP, NAMING_FORCE_FOLDERS, NAMING_ABD_PATTERN, NAMING_CUSTOM_ABD, \
+                NAMING_PATTERN, NAMING_MULTI_EP, NAMING_FORCE_FOLDERS, NAMING_ABD_PATTERN, NAMING_CUSTOM_ABD, NAMING_ANIME_PATTERN, NAMING_ANIME_MULTI_EP, NAMING_CUSTOM_ANIME,\
                 RENAME_EPISODES, properFinderScheduler, PROVIDER_ORDER, autoPostProcesserScheduler, \
                 NZBSRUS, NZBSRUS_UID, NZBSRUS_HASH, WOMBLE, NZBX, NZBX_COMPLETION, OMGWTFNZBS, OMGWTFNZBS_UID, OMGWTFNZBS_KEY, providerList, newznabProviderList, \
-                EXTRA_SCRIPTS, USE_TWITTER, TWITTER_USERNAME, TWITTER_PASSWORD, TWITTER_PREFIX, \
+                EXTRA_SCRIPTS, USE_TWITTER, TWITTER_USERNAME, TWITTER_PASSWORD, TWITTER_PREFIX, ANIME_DEFAULT,  \
                 USE_NOTIFO, NOTIFO_USERNAME, NOTIFO_APISECRET, NOTIFO_NOTIFY_ONDOWNLOAD, NOTIFO_NOTIFY_ONSNATCH, \
                 USE_BOXCAR, BOXCAR_USERNAME, BOXCAR_PASSWORD, BOXCAR_NOTIFY_ONDOWNLOAD, BOXCAR_NOTIFY_ONSNATCH, \
                 USE_PUSHOVER, PUSHOVER_USERKEY, PUSHOVER_NOTIFY_ONDOWNLOAD, PUSHOVER_NOTIFY_ONSNATCH, \
                 USE_LIBNOTIFY, LIBNOTIFY_NOTIFY_ONSNATCH, LIBNOTIFY_NOTIFY_ONDOWNLOAD, USE_NMJ, NMJ_HOST, NMJ_DATABASE, NMJ_MOUNT, USE_NMJv2, NMJv2_HOST, NMJv2_DATABASE, NMJv2_DBLOC, USE_SYNOINDEX, \
                 USE_BANNER, USE_LISTVIEW, METADATA_XBMC, METADATA_MEDIABROWSER, METADATA_PS3, METADATA_SYNOLOGY, metadata_provider_dict, \
-                NEWZBIN, NEWZBIN_USERNAME, NEWZBIN_PASSWORD, GIT_PATH, MOVE_ASSOCIATED_FILES, \
-                COMING_EPS_LAYOUT, COMING_EPS_SORT, COMING_EPS_DISPLAY_PAUSED, METADATA_WDTV, METADATA_TIVO, IGNORE_WORDS, CREATE_MISSING_SHOW_DIRS, \
-                ADD_SHOWS_WO_DIR
+                NEWZBIN, NEWZBIN_USERNAME, NEWZBIN_PASSWORD,FANZUB, GIT_PATH, MOVE_ASSOCIATED_FILES, \
+                COMING_EPS_LAYOUT, COMING_EPS_SORT, COMING_EPS_DISPLAY_PAUSED, METADATA_WDTV, METADATA_TIVO, IGNORE_WORDS, \
+                ANIMESUPPORT, USE_ANIDB, ANIDB_USERNAME, ANIDB_PASSWORD, ANIDB_USE_MYLIST, ANIME_SPLIT_HOME, CREATE_MISSING_SHOW_DIRS, \
+                ADD_SHOWS_WO_DIR, SYS_ENCODING, _CONFIG_SYS_ENCODING
 
         if __INITIALIZED__:
             return False
@@ -453,6 +469,10 @@ def initialize(consoleLogging=True):
         ENABLE_HTTPS = bool(check_setting_int(CFG, 'General', 'enable_https', 0))
         HTTPS_CERT = check_setting_str(CFG, 'General', 'https_cert', 'server.crt')
         HTTPS_KEY = check_setting_str(CFG, 'General', 'https_key', 'server.key')
+        
+        _CONFIG_SYS_ENCODING = check_setting_str(CFG, 'General', 'sys_encoding', '')
+        if _CONFIG_SYS_ENCODING:
+            SYS_ENCODING = _CONFIG_SYS_ENCODING
 
         ACTUAL_CACHE_DIR = check_setting_str(CFG, 'General', 'cache_dir', 'cache')
         # fix bad configs due to buggy code
@@ -488,7 +508,7 @@ def initialize(consoleLogging=True):
         if CACHE_DIR:
             TVDB_API_PARMS['cache'] = os.path.join(CACHE_DIR, 'tvdb')
 
-        TVDB_BASE_URL = 'http://www.thetvdb.com/api/' + TVDB_API_KEY
+        TVDB_BASE_URL = 'http://thetvdb.com/api/' + TVDB_API_KEY
 
         QUALITY_DEFAULT = check_setting_int(CFG, 'General', 'quality_default', SD)
         STATUS_DEFAULT = check_setting_int(CFG, 'General', 'status_default', SKIPPED)
@@ -499,9 +519,11 @@ def initialize(consoleLogging=True):
 
         NAMING_PATTERN = check_setting_str(CFG, 'General', 'naming_pattern', '')
         NAMING_ABD_PATTERN = check_setting_str(CFG, 'General', 'naming_abd_pattern', '')
+        NAMING_ANIME_PATTERN = check_setting_str(CFG, 'General', 'naming_anime_pattern', '')
         NAMING_CUSTOM_ABD = check_setting_int(CFG, 'General', 'naming_custom_abd', 0)
+        NAMING_CUSTOM_ANIME = check_setting_int(CFG, 'General', 'naming_custom_anime', 0)
         NAMING_MULTI_EP = check_setting_int(CFG, 'General', 'naming_multi_ep', 1)
-        NAMING_FORCE_FOLDERS = naming.check_force_season_folders()
+        NAMING_ANIME_MULTI_EP = check_setting_int(CFG, 'General', 'naming_anime_multi_ep', 1)
 
         USE_NZBS = bool(check_setting_int(CFG, 'General', 'use_nzbs', 0))
         USE_TORRENTS = bool(check_setting_int(CFG, 'General', 'use_torrents', 1))
@@ -509,7 +531,7 @@ def initialize(consoleLogging=True):
         NZB_METHOD = check_setting_str(CFG, 'General', 'nzb_method', 'blackhole')
         if NZB_METHOD not in ('blackhole', 'sabnzbd', 'nzbget'):
             NZB_METHOD = 'blackhole'
-        
+
         TORRENT_METHOD = check_setting_str(CFG, 'General', 'torrent_method', 'blackhole')
         if TORRENT_METHOD not in ('blackhole', 'utorrent', 'transmission', 'downloadstation', 'deluge'):
             TORRENT_METHOD = 'blackhole'
@@ -693,6 +715,8 @@ def initialize(consoleLogging=True):
         NEWZBIN_USERNAME = check_setting_str(CFG, 'Newzbin', 'newzbin_username', '')
         NEWZBIN_PASSWORD = check_setting_str(CFG, 'Newzbin', 'newzbin_password', '')
 
+        FANZUB = bool(check_setting_int(CFG, 'Fanzub', 'fanzub', 1))
+
         CheckSection(CFG, 'Womble')
         WOMBLE = bool(check_setting_int(CFG, 'Womble', 'womble', 1))
 
@@ -796,13 +820,13 @@ def initialize(consoleLogging=True):
         NMJ_HOST = check_setting_str(CFG, 'NMJ', 'nmj_host', '')
         NMJ_DATABASE = check_setting_str(CFG, 'NMJ', 'nmj_database', '')
         NMJ_MOUNT = check_setting_str(CFG, 'NMJ', 'nmj_mount', '')
-        
+
         CheckSection(CFG, 'NMJv2')
         USE_NMJv2 = bool(check_setting_int(CFG, 'NMJv2', 'use_nmjv2', 0))
         NMJv2_HOST = check_setting_str(CFG, 'NMJv2', 'nmjv2_host', '')
         NMJv2_DATABASE = check_setting_str(CFG, 'NMJv2', 'nmjv2_database', '')
         NMJ_DBLOC = check_setting_str(CFG, 'NMJv2', 'nmjv2_dbloc', '')
-        
+
         CheckSection(CFG, 'Synology')
         USE_SYNOINDEX = bool(check_setting_int(CFG, 'Synology', 'use_synoindex', 0))
 
@@ -828,6 +852,14 @@ def initialize(consoleLogging=True):
         NMA_API = check_setting_str(CFG, 'NMA', 'nma_api', '')
         NMA_PRIORITY = check_setting_str(CFG, 'NMA', 'nma_priority', "0")
 
+        ANIMESUPPORT = False
+        USE_ANIDB = check_setting_str(CFG, 'ANIDB', 'use_anidb', '')
+        ANIDB_USERNAME = check_setting_str(CFG, 'ANIDB', 'anidb_username', '')
+        ANIDB_PASSWORD = check_setting_str(CFG, 'ANIDB', 'anidb_password', '')
+        ANIDB_USE_MYLIST = check_setting_str(CFG, 'ANIDB', 'anidb_use_mylist', '')
+
+        ANIME_SPLIT_HOME = bool(check_setting_int(CFG, 'ANIME', 'anime_split_home', 0))
+
         # start up all the threads
         logger.sb_log_instance.initLogging(consoleLogging=consoleLogging)
 
@@ -844,6 +876,9 @@ def initialize(consoleLogging=True):
         migrator = ConfigMigrator(CFG)
         migrator.migrate_config()
 
+        # Database has to exist before naming.check_force_season_folders can be called.
+        NAMING_FORCE_FOLDERS = naming.check_force_season_folders()
+        
         currentSearchScheduler = scheduler.Scheduler(searchCurrent.CurrentSearcher(),
                                                      cycleTime=datetime.timedelta(minutes=SEARCH_FREQUENCY),
                                                      threadName="SEARCH",
@@ -1002,6 +1037,15 @@ def halt():
                 properFinderScheduler.thread.join(10)
             except:
                 pass
+            
+            if ADBA_CONNECTION:
+                ADBA_CONNECTION.logout()
+                #ADBA_CONNECTION.stop()
+                logger.log(u"Waiting for the ANIDB CONNECTION thread to exit")
+                try:
+                    ADBA_CONNECTION.join(5)
+                except:
+                    pass
 
             __INITIALIZED__ = False
 
@@ -1127,10 +1171,14 @@ def save_config():
     new_config['General']['provider_order'] = ' '.join([x.getID() for x in providers.sortedProviderList()])
     new_config['General']['version_notify'] = int(VERSION_NOTIFY)
     new_config['General']['naming_pattern'] = NAMING_PATTERN
-    new_config['General']['naming_custom_abd'] = int(NAMING_CUSTOM_ABD)
+    new_config['General']['naming_anime_pattern'] = NAMING_ANIME_PATTERN
     new_config['General']['naming_abd_pattern'] = NAMING_ABD_PATTERN
+    new_config['General']['naming_custom_abd'] = int(NAMING_CUSTOM_ABD)
+    new_config['General']['naming_custom_anime'] = int(NAMING_CUSTOM_ANIME)
     new_config['General']['naming_multi_ep'] = int(NAMING_MULTI_EP)
+    new_config['General']['naming_anime_multi_ep_type'] = int(NAMING_ANIME_MULTI_EP)
     new_config['General']['launch_browser'] = int(LAUNCH_BROWSER)
+    new_config['General']['sys_encoding'] = _CONFIG_SYS_ENCODING
 
     new_config['General']['use_banner'] = int(USE_BANNER)
     new_config['General']['use_listview'] = int(USE_LISTVIEW)
@@ -1247,10 +1295,13 @@ def save_config():
     new_config['Newzbin']['newzbin'] = int(NEWZBIN)
     new_config['Newzbin']['newzbin_username'] = NEWZBIN_USERNAME
     new_config['Newzbin']['newzbin_password'] = NEWZBIN_PASSWORD
+    
+    new_config['Fanzub'] = {}
+    new_config['Fanzub']['fanzub'] = int(FANZUB)
 
     new_config['Womble'] = {}
     new_config['Womble']['womble'] = int(WOMBLE)
-    
+
     new_config['nzbX'] = {}
     new_config['nzbX']['nzbx'] = int(NZBX)
     new_config['nzbX']['nzbx_completion'] = int(NZBX_COMPLETION)
@@ -1361,7 +1412,7 @@ def save_config():
     new_config['NMJv2']['nmjv2_host'] = NMJv2_HOST
     new_config['NMJv2']['nmjv2_database'] = NMJv2_DATABASE
     new_config['NMJv2']['nmjv2_dbloc'] = NMJv2_DBLOC
-    
+
     new_config['Trakt'] = {}
     new_config['Trakt']['use_trakt'] = int(USE_TRAKT)
     new_config['Trakt']['trakt_username'] = TRAKT_USERNAME
@@ -1386,6 +1437,15 @@ def save_config():
 
     new_config['Newznab'] = {}
     new_config['Newznab']['newznab_data'] = '!!!'.join([x.configStr() for x in newznabProviderList])
+
+    new_config['ANIDB'] = {}
+    new_config['ANIDB']['use_anidb'] = USE_ANIDB
+    new_config['ANIDB']['anidb_username'] = ANIDB_USERNAME
+    new_config['ANIDB']['anidb_password'] = ANIDB_PASSWORD
+    new_config['ANIDB']['anidb_use_mylist'] = ANIDB_USE_MYLIST
+
+    new_config['ANIME'] = {}
+    new_config['ANIME']['anime_split_home'] = int(ANIME_SPLIT_HOME)
 
     new_config['GUI'] = {}
     new_config['GUI']['coming_eps_layout'] = COMING_EPS_LAYOUT

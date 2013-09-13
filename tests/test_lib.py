@@ -27,10 +27,11 @@ sys.path.append(os.path.abspath('../lib'))
 
 import sickbeard
 import shutil, time
-from sickbeard import encodingKludge as ek, providers, tvcache
+from sickbeard import encodingKludge as ek, providers, tvcache, logger
 from sickbeard import db
 from sickbeard.databases import mainDB
 from sickbeard.databases import cache_db
+from lib.configobj import ConfigObj
 
 #=================
 # test globals
@@ -64,26 +65,44 @@ def createTestLogFolder():
 #=================
 # sickbeard globals
 #=================
-sickbeard.SYS_ENCODING = 'UTF-8'
-sickbeard.showList = []
-sickbeard.QUALITY_DEFAULT = 4 #hdtv
-sickbeard.FLATTEN_FOLDERS_DEFAULT = 0
+def setSickbeardGlobals():
+    sickbeard.SYS_ENCODING = 'UTF-8'
+    sickbeard.showList = []
+    sickbeard.QUALITY_DEFAULT = 4 #hdtv
+    sickbeard.FLATTEN_FOLDERS_DEFAULT = 0
 
-sickbeard.NAMING_PATTERN = ''
-sickbeard.NAMING_ABD_PATTERN = ''
-sickbeard.NAMING_MULTI_EP = 1
+    sickbeard.NAMING_PATTERN = ''
+    sickbeard.NAMING_ABD_PATTERN = ''
+    sickbeard.NAMING_MULTI_EP = 1
+    
+    sickbeard.NAMING_SHOW_NAME = 1
+    sickbeard.NAMING_EP_NAME = 1
+    sickbeard.NAMING_EP_TYPE = 0
+    sickbeard.NAMING_MULTI_EP_TYPE = 1
+    sickbeard.NAMING_SEP_TYPE = 0
+    sickbeard.NAMING_USE_PERIODS = 0
+    sickbeard.NAMING_QUALITY = 0
+    sickbeard.NAMING_DATES = 1
+    
+    sickbeard.PROVIDER_ORDER = ["sick_beard_index"]
+    sickbeard.newznabProviderList = providers.getNewznabProviderList("Sick Beard Index|http://momo.sickbeard.com/||1!!!NZBs.org|http://beta.nzbs.org/||0")
+    sickbeard.providerList = providers.makeProviderList()
+    
+    sickbeard.PROG_DIR = os.path.abspath('..')
+    sickbeard.DATA_DIR = sickbeard.PROG_DIR
+    sickbeard.LOG_DIR = os.path.join(TESTDIR, 'Logs')
 
 
-sickbeard.PROVIDER_ORDER = ["sick_beard_index"]
-sickbeard.newznabProviderList = providers.getNewznabProviderList("Sick Beard Index|http://momo.sickbeard.com/||1!!!NZBs.org|http://nzbs.org/||0")
-sickbeard.providerList = providers.makeProviderList()
+    sickbeard.PROVIDER_ORDER = ["sick_beard_index"]
+    sickbeard.newznabProviderList = providers.getNewznabProviderList("Sick Beard Index|http://momo.sickbeard.com/||1!!!NZBs.org|http://nzbs.org/||0")
+    sickbeard.providerList = providers.makeProviderList()
 
-sickbeard.PROG_DIR = os.path.abspath('..')
-sickbeard.DATA_DIR = sickbeard.PROG_DIR
-sickbeard.LOG_DIR = os.path.join(TESTDIR, 'Logs')
-createTestLogFolder()
+    sickbeard.PROG_DIR = os.path.abspath('..')
+    sickbeard.DATA_DIR = sickbeard.PROG_DIR
+    sickbeard.LOG_DIR = os.path.join(TESTDIR, 'Logs')
+    createTestLogFolder()
+
 sickbeard.logger.sb_log_instance.initLogging(False)
-
 #=================
 # dummy functions
 #=================
@@ -105,17 +124,33 @@ sickbeard.tv.TVEpisode.specifyEpisode = _fake_specifyEP
 #=================
 class SickbeardTestDBCase(unittest.TestCase):
     def setUp(self):
-        sickbeard.showList = []
+        setSickbeardGlobals()
         setUp_test_db()
         setUp_test_episode_file()
         setUp_test_show_dir()
+        
+        logger.log("############################################################", logger.DEBUG)
+        logger.log("     SET UP DONE", logger.DEBUG)
+        logger.log("############################################################", logger.DEBUG)
+        logger.log("     Running test " + self.id(), logger.DEBUG)
+        logger.log("############################################################", logger.DEBUG)
+        
 
     def tearDown(self):
-        sickbeard.showList = []
         tearDown_test_db()
         tearDown_test_episode_file()
         tearDown_test_show_dir()
 
+class SickbeardTestConfigCase(unittest.TestCase):
+    
+    def setUp(self):
+        sickbeard.CONFIG_FILE = "../config.ini"
+        sickbeard.CFG = ConfigObj(sickbeard.CONFIG_FILE)
+        sickbeard.initialize(consoleLogging=False)
+        
+    def tearDown(self):
+        
+        unittest.TestCase.tearDown(self)
 
 class TestDBConnection(db.DBConnection, object):
 
@@ -128,10 +163,11 @@ class TestCacheDBConnection(TestDBConnection, object):
 
     def __init__(self, providerName):
         db.DBConnection.__init__(self, os.path.join(TESTDIR, TESTCACHEDBNAME))
-
+        
+        #TODO: find a way to call code from acctualy class. we might have to take it out of the __init__ and make a separate function so we can call it from here
         # Create the table if it's not already there
         try:
-            sql = "CREATE TABLE " + providerName + " (name TEXT, season NUMERIC, episodes TEXT, tvrid NUMERIC, tvdbid NUMERIC, url TEXT, time NUMERIC, quality TEXT);"
+            sql = "CREATE TABLE "+providerName+" (name TEXT, season NUMERIC, episodes TEXT, tvrid NUMERIC, tvdbid NUMERIC, url TEXT, time NUMERIC, quality TEXT, release_group TEXT);"
             self.connection.execute(sql)
             self.connection.commit()
         except sqlite3.OperationalError, e:
@@ -158,6 +194,10 @@ sickbeard.tvcache.CacheDBConnection = TestCacheDBConnection
 def setUp_test_db():
     """upgrades the db to the latest version
     """
+    logger.log("############################################################", logger.DEBUG)
+    logger.log("     SETINGUP DB", logger.DEBUG)
+    logger.log("############################################################", logger.DEBUG)
+
     # upgrading the db
     db.upgradeDatabase(db.DBConnection(), mainDB.InitialSchema)
     # fix up any db problems
@@ -173,32 +213,48 @@ def tearDown_test_db():
     """
     # uncomment next line so leave the db intact beween test and at the end
     #return False
+    logger.log("############################################################", logger.DEBUG)
+    logger.log("     REMOVING DB", logger.DEBUG)
+    logger.log("############################################################", logger.DEBUG)
+
     if os.path.exists(os.path.join(TESTDIR, TESTDBNAME)):
         os.remove(os.path.join(TESTDIR, TESTDBNAME))
     if os.path.exists(os.path.join(TESTDIR, TESTCACHEDBNAME)):
         os.remove(os.path.join(TESTDIR, TESTCACHEDBNAME))
 
 
-def setUp_test_episode_file():
-    if not os.path.exists(FILEDIR):
-        os.makedirs(FILEDIR)
+def setUp_test_episode_file(fileDir=FILEDIR, fileName=FILENAME):
+    if not fileDir is FILEDIR:
+        fileDir = os.path.join(TESTDIR, "complete", fileName)
 
-    f = open(FILEPATH, "w")
-    f.write("foo bar")
+    if not os.path.exists(fileDir):
+        os.makedirs(fileDir)
+
+    filePath = os.path.join(fileDir, fileName)
+
+    f = open(filePath, "w")
+    f.write("foo bar. some fake content")
     f.close()
+    return filePath
 
 
-def tearDown_test_episode_file():
-    shutil.rmtree(FILEDIR)
+def tearDown_test_episode_file(fileDir=FILEDIR):
+    if os.path.isdir(fileDir):
+        shutil.rmtree(FILEDIR)
 
 
-def setUp_test_show_dir():
-    if not os.path.exists(SHOWDIR):
-        os.makedirs(SHOWDIR)
+def setUp_test_show_dir(showDir=SHOWDIR):
+    if not showDir is SHOWDIR:
+        showDir = os.path.join(TESTDIR, "shows", showDir)
+
+    if not os.path.exists(showDir):
+        os.makedirs(showDir)
+
+    return showDir
 
 
-def tearDown_test_show_dir():
-    shutil.rmtree(SHOWDIR)
+def tearDown_test_show_dir(showDir=SHOWDIR):
+    shutil.rmtree(showDir)
 
 tearDown_test_db()
 

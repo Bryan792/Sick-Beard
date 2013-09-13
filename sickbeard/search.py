@@ -26,17 +26,17 @@ import sickbeard
 from common import SNATCHED, Quality, SEASON_RESULT, MULTI_EP_RESULT
 
 from sickbeard import logger, db, show_name_helpers, exceptions, helpers
+from sickbeard.downloaders import utorrent, transmission, downloadstation, deluge
 from sickbeard import sab
 from sickbeard import nzbget
 from sickbeard import history
 from sickbeard import notifiers
 from sickbeard import nzbSplitter
-from sickbeard.downloaders import utorrent, transmission, downloadstation, deluge
 from sickbeard import ui
 from sickbeard import encodingKludge as ek
-from sickbeard import providers
-
 from sickbeard.exceptions import ex
+from sickbeard import providers
+from sickbeard.blackandwhitelist import *
 from sickbeard.providers.generic import GenericProvider
 
 import urllib
@@ -175,6 +175,7 @@ def searchForNeededEpisodes():
     # ask all providers for any episodes it finds
     for curProvider in providers.sortedProviderList():
 
+        # is curProvider active 
         if not curProvider.isActive():
             continue
 
@@ -205,13 +206,14 @@ def searchForNeededEpisodes():
                 if not bestResult or bestResult.quality < curResult.quality:
                     bestResult = curResult
 
-            bestResult = pickBestResult(curFoundResults[curEp])
+            bestResult = pickBestResult(curFoundResults[curEp], show=curEp.show)
 
             # if it's already in the list (from another provider) and the newly found quality is no better then skip it
             if curEp in foundResults and bestResult.quality <= foundResults[curEp].quality:
                 continue
 
-            foundResults[curEp] = bestResult
+            if bestResult: #if we didn't find any result don't add None
+                foundResults[curEp] = bestResult
 
     if not didSearch:
         logger.log(u"No NZB/Torrent providers found or enabled in the sickbeard config. Please check your settings.", logger.ERROR)
@@ -219,15 +221,27 @@ def searchForNeededEpisodes():
     return foundResults.values()
 
 
-def pickBestResult(results, quality_list=None):
+def pickBestResult(results, quality_list=None, show=None):
 
     logger.log(u"Picking the best result out of "+str([x.name for x in results]), logger.DEBUG)
 
+    # build the black And white list
+    bwl = None
+    if show:
+        bwl = BlackAndWhiteList(show.tvdbid)
+    else:
+        logger.log("Could not create black and white list no show was given", logger.DEBUG)
+        
     # find the best result for the current episode
     bestResult = None
     for cur_result in results:
         logger.log("Quality of "+cur_result.name+" is "+Quality.qualityStrings[cur_result.quality])
         
+        if bwl:
+            if not bwl.is_valid(cur_result):
+                logger.log(cur_result.name+" does not match the blacklist or the whitelist, rejecting it. Result: " + bwl.get_last_result_msg(), logger.MESSAGE)
+                continue
+
         if quality_list and cur_result.quality not in quality_list:
             logger.log(cur_result.name+" is a quality we know we don't want, rejecting it", logger.DEBUG)
             continue
@@ -235,7 +249,7 @@ def pickBestResult(results, quality_list=None):
         if not bestResult or bestResult.quality < cur_result.quality and cur_result.quality != Quality.UNKNOWN:
             bestResult = cur_result
         elif bestResult.quality == cur_result.quality:
-            if ("proper" not in bestResult.name.lower() and "repack" not in bestResult.name.lower()) and ("proper" in cur_result.name.lower() or "repack" in cur_result.name.lower()):
+            if bestResult.is_proper:
                 bestResult = cur_result
             elif "internal" in bestResult.name.lower() and "internal" not in cur_result.name.lower():
                 bestResult = cur_result
@@ -260,10 +274,16 @@ def isFinalResult(result):
     
     show_obj = result.episodes[0].show
     
+    bwl = BlackAndWhiteList(show_obj.tvdbid)
+
     any_qualities, best_qualities = Quality.splitQuality(show_obj.quality)
     
     # if there is a redownload that's higher than this then we definitely need to keep looking
     if best_qualities and result.quality < max(best_qualities):
+        return False
+
+    # if it does not match the shows black and white list its no good
+    elif not bwl.is_valid(result):
         return False
 
     # if there's no redownload that's higher (above) and this is the highest initial download then we're good
@@ -298,43 +318,76 @@ def findEpisode(episode, manualSearch=False):
         if not curProvider.isActive():
             continue
 
+        # we check our results after every search string
+        # this is done because in the future we will have a ordered list of all show aliases and release_group aliases
+        # ordered by success rate ...
+
+        # lets get all search strings
+        # we use the method from the curProvider to accommodate for the internal join functions
+        # this way we do not break the special abilities of the providers e.g. nzbmatrix
+        searchStrings = curProvider.get_episode_search_strings(episode)
+        logger.log("All search string permutations (" + curProvider.name + "):" + str(searchStrings))
+        """
         try:
-            curFoundResults = curProvider.findEpisode(episode, manualSearch=manualSearch)
-        except exceptions.AuthException, e:
-            logger.log(u"Authentication error: "+ex(e), logger.ERROR)
-            continue
-        except Exception, e:
-            logger.log(u"Error while searching "+curProvider.name+", skipping: "+ex(e), logger.ERROR)
-            logger.log(traceback.format_exc(), logger.DEBUG)
-            continue
-
-        didSearch = True
-
-        # skip non-tv crap
-        curFoundResults = filter(lambda x: show_name_helpers.filterBadReleases(x.name) and show_name_helpers.isGoodResult(x.name, episode.show), curFoundResults)
-
-        # loop all results and see if any of them are good enough that we can stop searching
+            searchStrings = list(set(searchStrings))
+        except TypeError:
+            pass
+        """
         done_searching = False
-        for cur_result in curFoundResults:
-            done_searching = isFinalResult(cur_result)
-            logger.log(u"Should we stop searching after finding "+cur_result.name+": "+str(done_searching), logger.DEBUG)
+        for searchString in searchStrings:
+            try:
+                curFoundResults = curProvider.findEpisode(episode, manualSearch=manualSearch, searchString=searchString)
+            except exceptions.AuthException, e:
+                logger.log(u"Authentication error: "+ex(e), logger.ERROR)
+                break # break the while loop
+            except Exception, e:
+                logger.log(u"Error while searching "+curProvider.name+", skipping: "+ex(e), logger.ERROR)
+                logger.log(traceback.format_exc(), logger.DEBUG)
+                break # break the while loop
+
+            didSearch = True
+
+            # skip non-tv crap
+            curFoundResults = filter(lambda x: show_name_helpers.filterBadReleases(x.name) and show_name_helpers.isGoodResult(x.name, episode.show, season=episode.season), curFoundResults)
+
+            # loop all results and see if any of them are good enough that we can stop searching
+            for cur_result in curFoundResults:
+                done_searching = isFinalResult(cur_result)
+                logger.log(u"Should we stop searching after finding "+cur_result.name+": "+str(done_searching), logger.DEBUG)
+                if done_searching:
+                    break
+
+            # if we are searching an anime we are a little more loose
+            # this means we check every turn for a possible result
+            # in contrast the isFinalResultlooks function looks for a perfect result (best quality)
+            # but this will accept any result that would have been picked in the end -> pickBestResult
+            # and then stop and use that
+            if episode.show.is_anime:
+                logger.log(u"We are searching an anime. i am checking if we got a good result with search provider "+curProvider.name, logger.DEBUG)
+                bestResult = pickBestResult(curFoundResults, show=episode.show)
+                if bestResult:
+                    return bestResult
+
+            foundResults += curFoundResults
+            # if we did find a result that's good enough to stop then don't continue
+            # this breaks the turn loop
             if done_searching:
                 break
-        
-        foundResults += curFoundResults
 
         # if we did find a result that's good enough to stop then don't continue
+        # this breaks the for each provider loop
         if done_searching:
             break
+
 
     if not didSearch:
         logger.log(u"No NZB/Torrent providers found or enabled in the sickbeard config. Please check your settings.", logger.ERROR)
 
-    bestResult = pickBestResult(foundResults)
+    bestResult = pickBestResult(foundResults, show=episode.show)
 
     return bestResult
 
-def findSeason(show, season):
+def findSeason(show, season, scene=False):
 
     logger.log(u"Searching for stuff we need from "+show.name+" season "+str(season))
 
@@ -348,13 +401,13 @@ def findSeason(show, season):
             continue
 
         try:
-            curResults = curProvider.findSeasonResults(show, season)
+            curResults = curProvider.findSeasonResults(show, season, scene)
 
             # make a list of all the results for this provider
             for curEp in curResults:
 
                 # skip non-tv crap
-                curResults[curEp] = filter(lambda x:  show_name_helpers.filterBadReleases(x.name) and show_name_helpers.isGoodResult(x.name, show), curResults[curEp])
+                curResults[curEp] = filter(lambda x:  show_name_helpers.filterBadReleases(x.name) and show_name_helpers.isGoodResult(x.name, show, season=season), curResults[curEp])
 
                 if curEp in foundResults:
                     foundResults[curEp] += curResults[curEp]
@@ -381,10 +434,7 @@ def findSeason(show, season):
     # pick the best season NZB
     bestSeasonNZB = None
     if SEASON_RESULT in foundResults:
-        bestSeasonNZB = pickBestResult(foundResults[SEASON_RESULT], anyQualities+bestQualities)
-        
-    if bestSeasonNZB and bestSeasonNZB.provider.providerType == GenericProvider.TORRENT and sickbeard.PREFER_EPISODE_RELEASES:
-        bestSeasonNZB = None
+        bestSeasonNZB = pickBestResult(foundResults[SEASON_RESULT], anyQualities+bestQualities,show=show)
 
     highest_quality_overall = 0
     for cur_season in foundResults:
@@ -437,7 +487,7 @@ def findSeason(show, season):
                 # if not, break it apart and add them as the lowest priority results
                 individualResults = nzbSplitter.splitResult(bestSeasonNZB)
 
-                individualResults = filter(lambda x:  show_name_helpers.filterBadReleases(x.name) and show_name_helpers.isGoodResult(x.name, show), individualResults)
+                individualResults = filter(lambda x:  show_name_helpers.filterBadReleases(x.name) and show_name_helpers.isGoodResult(x.name, show, season=season), individualResults)
 
                 for curResult in individualResults:
                     if len(curResult.episodes) == 1:
@@ -531,7 +581,9 @@ def findSeason(show, season):
 
         if len(foundResults[curEp]) == 0:
             continue
-
-        finalResults.append(pickBestResult(foundResults[curEp]))
+        
+        bestResult = pickBestResult(foundResults[curEp],show=show)
+        if bestResult:
+            finalResults.append(bestResult)
 
     return finalResults
