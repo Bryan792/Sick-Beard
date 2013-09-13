@@ -32,6 +32,7 @@ from threading import Lock
 from sickbeard import providers, metadata
 from providers import ezrss, tvtorrents, btn, nzbsrus, newznab, womble, nzbx, omgwtfnzbs, fanzub
 from providers import kickass, torrentz, dtt, torrentleech, thepiratebay, publichd, torrentday
+from providers import nyaatorrents
 from providers import sceneaccess, iptorrents, bithdtv, fucklimits
 from sickbeard.config import CheckSection, check_setting_int, check_setting_str, ConfigMigrator
 
@@ -166,6 +167,8 @@ EZRSS = False
 DTT = False
 DTT_NORAR = False
 DTT_SINGLE = False
+
+NYAATORRENTS = False
 
 THEPIRATEBAY = False
 THEPIRATEBAY_TRUSTED = False
@@ -412,6 +415,7 @@ def initialize(consoleLogging=True):
                 FUCKLIMITS, FUCKLIMITS_USERNAME, FUCKLIMITS_PASSWORD, \
                 PUBLICHD, \
                 NZBS, NZBS_UID, NZBS_HASH, EZRSS, DTT, DTT_NORAR, DTT_SINGLE, \
+                NYAATORRENTS, \
                 THEPIRATEBAY, THEPIRATEBAY_TRUSTED, THEPIRATEBAY_PROXY, THEPIRATEBAY_PROXY_URL, THEPIRATEBAY_URL_OVERRIDE, \
                 TVTORRENTS, TVTORRENTS_DIGEST, TVTORRENTS_HASH, BTN, BTN_API_KEY, TORRENT_DIR, USENET_RETENTION, SOCKET_TIMEOUT, \
                 SEARCH_FREQUENCY, DEFAULT_SEARCH_FREQUENCY, BACKLOG_SEARCH_FREQUENCY, \
@@ -574,6 +578,7 @@ def initialize(consoleLogging=True):
         BTN_API_KEY = check_setting_str(CFG, 'BTN', 'btn_api_key', '')
 
         KICKASS = bool(check_setting_int(CFG, 'KICKASS', 'kickass', 0))
+        NYAATORRENTS = bool(check_setting_int(CFG, 'NYAATORRENTS', 'nyaatorrents', 0))
         
         TORRENTZ = bool(check_setting_int(CFG, 'TORRENTZ', 'torrentz', 0))    
         TORRENTZ_VERIFIED = bool(check_setting_int(CFG, 'TORRENTZ', 'torrentz_verified', 0))    
@@ -1218,6 +1223,9 @@ def save_config():
     new_config['KICKASS'] = {}
     new_config['KICKASS']['kickass'] = int(KICKASS)
 
+    new_config['NYAATORRENTS'] = {}
+    new_config['NYAATORRENTS']['nyaatorrents'] = int(NYAATORRENTS)
+    
     new_config['TORRENTZ'] = {}
     new_config['TORRENTZ']['torrentz'] = int(TORRENTZ)
     new_config['TORRENTZ']['torrentz_verified'] = int(TORRENTZ_VERIFIED)

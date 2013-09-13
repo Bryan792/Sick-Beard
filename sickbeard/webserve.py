@@ -1138,6 +1138,8 @@ class ConfigProviders:
                 sickbeard.EZRSS = curEnabled
             elif curProvider == 'kickass':
                 sickbeard.KICKASS = curEnabled
+            elif curProvider == 'nyaatorrents':
+                sickbeard.NYAATORRENTS = curEnabled
             elif curProvider == 'torrentz':
                 sickbeard.TORRENTZ = curEnabled
             elif curProvider == 'thepiratebay':

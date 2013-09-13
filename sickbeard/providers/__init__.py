@@ -34,7 +34,8 @@ __all__ = ['ezrss',
            'sceneaccess',
            'iptorrents',
            'bithdtv',
-           'fucklimits'
+           'fucklimits',
+           'nyaatorrents'
            ]
 
 import sickbeard
