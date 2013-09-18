@@ -128,33 +128,26 @@ class ThePirateBayProvider(generic.TorrentProvider):
         
         return search_string
 
-#    ###################################################################################################
-#    def _get_episode_search_strings(self, ep_obj):
-#       
-#        search_string = []
-#       
-#        if not ep_obj:
-#            return []
-#                
-#        if ep_obj.show.air_by_date:
-#            for show_name in set(show_name_helpers.allPossibleShowNames(ep_obj.show)):
-#                ep_string = show_name_helpers.sanitizeSceneName(show_name) +' '+ str(ep_obj.airdate).replace('-', '.')
-#                search_string.append(ep_string)
-#        else:
-#            for show_name in set(show_name_helpers.allPossibleShowNames(ep_obj.show)):
-#                ep_string = show_name_helpers.sanitizeSceneName(show_name) +' '+ sickbeard.config.naming_ep_type[2] % {'seasonnumber': ep_obj.season, 'episodenumber': ep_obj.episode}
-#                search_string.append(ep_string)
-#    
-#        return search_string
-#
-#    ###################################################################################################
-
-
+    ###################################################################################################
     def _get_episode_search_strings(self, ep_obj):
-        # names = [(ep_obj.show.name + " " + str(ep_obj.absolute_number)).encode('utf-8')]
-        names = show_name_helpers.makeSceneSearchString(ep_obj)
-        return names
+       
+        search_string = []
+       
+        if not ep_obj:
+            return []
+                
+        if ep_obj.show.air_by_date:
+            for show_name in set(show_name_helpers.allPossibleShowNames(ep_obj.show)):
+                ep_string = show_name_helpers.sanitizeSceneName(show_name) +' '+ str(ep_obj.airdate).replace('-', '.')
+                search_string.append(ep_string)
+        else:
+            for show_name in set(show_name_helpers.allPossibleShowNames(ep_obj.show)):
+                ep_string = show_name_helpers.sanitizeSceneName(show_name) +' '+ sickbeard.config.naming_ep_type[2] % {'seasonnumber': ep_obj.season, 'episodenumber': ep_obj.episode}
+                search_string.append(ep_string)
+    
+        return search_string
 
+    ###################################################################################################
     def _doSearch(self, search_params, show=None):
         results = []
         searchURL = self.proxy._buildURL(self.searchurl %(urllib.quote(search_params)))    
