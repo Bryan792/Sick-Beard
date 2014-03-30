@@ -249,6 +249,7 @@ def makeSceneSearchString (episode):
             if len(bwl.whiteList) > 0:
                 for keyword in bwl.whiteList:
                     toReturn.append(keyword + '.' + curShow + '.' + curEpString)
+                    toReturn.append(keyword + '.' + curShow + '.0' + curEpString)
             else:
                 toReturn.append(curShow + '.' + curEpString)
 
